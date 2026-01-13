@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Sound Garden</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #FDFBF7; /* Creamy paper */
+            background-image: radial-gradient(#E5E7EB 1px, transparent 1px);
+            background-size: 20px 20px;
+            /* Prevent double-tap zoom on tablets */
+            touch-action: manipulation; 
+        }
+
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #D4A373;
+            border: 4px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            cursor: pointer;
+            margin-top: -10px;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #E7E5E4;
+            border-radius: 3px;
+        }
+
+        #badge-list::-webkit-scrollbar {
+            height: 6px;
+        }
+        #badge-list::-webkit-scrollbar-thumb {
+            background-color: #D6D3D1;
+            border-radius: 3px;
+        }
+
+        /* Make the grid items feel tactile */
+        .grid-cell {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .grid-cell:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="text-stone-700 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header / Controls -->
+    <header class="bg-white border-b border-stone-200 p-4 shadow-sm z-10">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Title -->
+            <div class="flex items-center gap-2">
+                <div class="bg-stone-800 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-sm">🎵</div>
+                <h1 class="text-2xl font-bold tracking-tight text-stone-800 hidden sm:block">Sound Garden</h1>
+            </div>
+
+            <!-- Main Controls -->
+            <div class="flex flex-1 justify-center">
+                <div class="flex items-center gap-4 sm:gap-8 bg-stone-50 px-6 py-2 rounded-full border border-stone-200 shadow-inner">
+                    <!-- Play Button -->
+                    <button id="play-btn" class="bg-stone-800 hover:bg-stone-700 text-white font-bold py-2 px-8 rounded-full transition-colors shadow-md text-lg">
+                        Play
+                    </button>
+
+                    <!-- Tempo -->
+                    <div class="flex flex-col w-32 sm:w-48">
+                        <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">Speed: <span id="tempo-val">120</span></label>
+                        <input type="range" id="tempo" min="60" max="200" value="120">
+                    </div>
+
+                    <!-- Waveform -->
+                    <div class="hidden sm:flex flex-col">
+                        <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">Sound</label>
+                        <select id="waveform" class="bg-transparent font-bold text-stone-700 focus:outline-none cursor-pointer">
+                            <option value="triangle">Soft (Triangle)</option>
+                            <option value="sine">Pure (Sine)</option>
+                            <option value="square">Retro (Square)</option>
+                            <option value="sawtooth">Sharp (Saw)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tools -->
+            <div class="flex gap-2">
+                <button id="clear-btn" class="text-stone-400 hover:text-red-500 font-bold text-sm px-3 py-1">Clear</button>
+                <button id="reset-game-btn" class="text-stone-300 hover:text-stone-500 text-xs underline">Reset</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 relative flex flex-col items-center justify-center bg-stone-50 overflow-hidden p-2 sm:p-6">
+        
+        <!-- The Grid -->
+        <!-- Changed max-w-4xl to max-w-7xl for wider spread -->
+        <div class="bg-white p-4 sm:p-8 rounded-3xl shadow-xl border border-stone-100 w-full max-w-7xl flex flex-col h-full max-h-full">
+            
+            <!-- Grid container populated by JS -->
+            <!-- flex-1 allows it to take available height, keeping cells proportional -->
+            <div id="grid" class="grid gap-2 sm:gap-3 w-full h-full"></div>
+            
+            <!-- Pitch Labels -->
+            <div class="flex justify-between mt-2 text-xs text-stone-400 font-bold uppercase tracking-widest shrink-0">
+                <span>Low Pitch</span>
+                <span>High Pitch</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer: Gamification / Badges -->
+    <footer class="bg-white border-t border-stone-200 h-28 shrink-0 z-10">
+        <div class="max-w-7xl mx-auto h-full flex flex-col justify-center px-6">
+            <h3 class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">Explorer's Badges</h3>
+            <div id="badge-list" class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                <!-- Badges injected here -->
+            </div>
+        </div>
+    </footer>
+
+    <!-- Achievement Notification Popup -->
+    <div id="badge-notification" class="fixed bottom-36 right-8 bg-amber-100 border-l-4 border-amber-400 p-4 rounded shadow-lg transform translate-y-full opacity-0 transition-all duration-500 z-50 flex items-center gap-4">
+        <div class="text-3xl" id="badge-icon">🌟</div>
+        <div>
+            <div class="text-amber-800 font-bold text-sm uppercase">Badge Unlocked!</div>
+            <div class="text-amber-900 font-bold text-lg" id="badge-name">Badge Name</div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SECTION 1: CONFIGURATION
+         */
+        const CONFIG = {
+            // GRID SIZE ADJUSTED FOR 4TH GRADE ACCESSIBILITY
+            // 8 rows x 16 cols creates large, clickable targets.
+            rows: 8,
+            cols: 16,
+
+            // Gamification
+            badges: [
+                {
+                    id: 'first_note',
+                    name: 'Seed Planter',
+                    description: 'Place your first note on the grid.',
+                    icon: '🌱',
+                    condition: (state) => state.notesPlaced >= 1
+                },
+                {
+                    id: 'full_column',
+                    name: 'Harmony Hero',
+                    description: 'Play 3 notes at the exact same time.',
+                    icon: '🎵',
+                    condition: (state) => state.maxSimultaneous >= 3
+                },
+                {
+                    id: 'tempo_changer',
+                    name: 'Time Traveler',
+                    description: 'Change the speed (BPM) of the song.',
+                    icon: '🚀',
+                    condition: (state) => state.bpmChanged === true
+                },
+                {
+                    id: 'shape_shifter',
+                    name: 'Shape Shifter',
+                    description: 'Change the sound wave shape.',
+                    icon: '🌊',
+                    condition: (state) => state.waveformChanged === true
+                },
+                {
+                    id: 'master_composer',
+                    name: 'Master Gardener',
+                    description: 'Fill at least 20 spots on the grid.',
+                    icon: '🌳',
+                    condition: (state) => state.notesPlaced >= 20
+                }
+            ],
+
+            colors: {
+                activeTile: '#8B9D83', // Sage Green
+                playhead: '#D4A373',   // Wood/Clay
+            }
+        };
+
+        /**
+         * SECTION 2: AUDIO ENGINE
+         */
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // Master Volume
+        const masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.4;
+        masterGain.connect(audioCtx.destination);
+
+        // Simple Reverb
+        const reverbNode = audioCtx.createConvolver();
+        const reverbGain = audioCtx.createGain();
+        reverbGain.gain.value = 0.3; // 30% Wet
+        reverbNode.connect(reverbGain);
+        reverbGain.connect(masterGain);
+        masterGain.connect(reverbNode);
+
+        // Generate Reverb Impulse
+        function createImpulse() {
+            const rate = audioCtx.sampleRate;
+            const length = rate * 2.0; 
+            const decay = 2.0;
+            const impulse = audioCtx.createBuffer(2, length, rate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+            for (let i = 0; i < length; i++) {
+                const n = length - i;
+                left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+                right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+            }
+            return impulse;
+        }
+        reverbNode.buffer = createImpulse();
+
+        // Pentatonic Scale
+        const PENTATONIC_SCALE = [0, 2, 4, 7, 9, 12, 14, 16];
+
+        class Synthesizer {
+            constructor() {
+                this.waveform = 'triangle';
+            }
+
+            setWaveform(type) {
+                if(['sine', 'square', 'sawtooth', 'triangle'].includes(type)) {
+                    this.waveform = type;
+                }
+            }
+
+            playNote(row, duration) {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                // Calculate Frequency (Pentatonic)
+                const invertedRow = (CONFIG.rows - 1) - row;
+                const rootNote = 60; // Middle C
+                const noteIndex = invertedRow % PENTATONIC_SCALE.length;
+                const octaveOffset = Math.floor(invertedRow / PENTATONIC_SCALE.length) * 12;
+                const midiNote = rootNote + PENTATONIC_SCALE[noteIndex] + octaveOffset;
+                const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = this.waveform;
+                osc.frequency.value = freq;
+
+                // Envelope
+                const now = audioCtx.currentTime;
+                const attack = 0.05;
+                const release = 0.3;
+
+                osc.connect(gain);
+                gain.connect(masterGain);
+
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.5, now + attack);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration + release);
+
+                osc.start(now);
+                osc.stop(now + duration + release + 0.1);
+                
+                setTimeout(() => {
+                    osc.disconnect();
+                    gain.disconnect();
+                }, (duration + release + 1) * 1000);
+            }
+        }
+        const synth = new Synthesizer();
+
+
+        /**
+         * SECTION 3: GAME MANAGER
+         */
+        class GameManager {
+            constructor() {
+                this.storageKey = 'soundGarden_v1';
+                this.state = this.loadState();
+            }
+
+            getInitialState() {
+                return {
+                    notesPlaced: 0,
+                    maxSimultaneous: 0,
+                    bpmChanged: false,
+                    waveformChanged: false,
+                    unlockedBadges: [],
+                    gridData: []
+                };
+            }
+
+            loadState() {
+                const data = localStorage.getItem(this.storageKey);
+                return data ? JSON.parse(data) : this.getInitialState();
+            }
+
+            saveState() {
+                localStorage.setItem(this.storageKey, JSON.stringify(this.state));
+            }
+
+            resetProgress() {
+                this.state = this.getInitialState();
+                this.saveState();
+                location.reload();
+            }
+
+            trackAction(actionType, payload) {
+                let earnedNewBadge = false;
+
+                if (actionType === 'NOTE_PLACED') this.state.notesPlaced++;
+                if (actionType === 'BPM_CHANGED') this.state.bpmChanged = true;
+                if (actionType === 'WAVE_CHANGED') this.state.waveformChanged = true;
+                if (actionType === 'PLAY_STEP') {
+                    if (payload.noteCount > this.state.maxSimultaneous) {
+                        this.state.maxSimultaneous = payload.noteCount;
+                    }
+                }
+
+                CONFIG.badges.forEach(badge => {
+                    if (!this.state.unlockedBadges.includes(badge.id)) {
+                        if (badge.condition(this.state)) {
+                            this.unlockBadge(badge);
+                            earnedNewBadge = true;
+                        }
+                    }
+                });
+
+                this.saveState();
+                return earnedNewBadge;
+            }
+
+            unlockBadge(badge) {
+                this.state.unlockedBadges.push(badge.id);
+                
+                const notification = document.getElementById('badge-notification');
+                document.getElementById('badge-name').textContent = badge.name;
+                document.getElementById('badge-icon').textContent = badge.icon;
+                
+                notification.classList.remove('translate-y-full', 'opacity-0');
+                notification.classList.add('translate-y-0', 'opacity-100');
+                
+                this.playWinSound();
+
+                setTimeout(() => {
+                    notification.classList.add('translate-y-full', 'opacity-0');
+                    notification.classList.remove('translate-y-0', 'opacity-100');
+                }, 4000);
+            }
+            
+            playWinSound() {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1); 
+                
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+        const gameManager = new GameManager();
+
+
+        /**
+         * SECTION 4: MAIN APP LOGIC
+         */
+        
+        // DOM Elements
+        const gridContainer = document.getElementById('grid');
+        const playBtn = document.getElementById('play-btn');
+        const tempoSlider = document.getElementById('tempo');
+        const tempoVal = document.getElementById('tempo-val');
+        const waveSelector = document.getElementById('waveform');
+        const clearBtn = document.getElementById('clear-btn');
+        const resetGameBtn = document.getElementById('reset-game-btn');
+        const badgeList = document.getElementById('badge-list');
+
+        let isPlaying = false;
+        let currentStep = 0;
+        let intervalId = null;
+        let gridState = Array(CONFIG.rows).fill().map(() => Array(CONFIG.cols).fill(false));
+
+        function init() {
+            createGrid();
+            renderBadges();
+            
+            // Listeners
+            playBtn.addEventListener('click', togglePlay);
+            clearBtn.addEventListener('click', clearGrid);
+            resetGameBtn.addEventListener('click', () => {
+                if(confirm("Are you sure? This will delete all badges!")) {
+                    gameManager.resetProgress();
+                }
+            });
+            
+            tempoSlider.addEventListener('input', (e) => {
+                tempoVal.textContent = e.target.value;
+                gameManager.trackAction('BPM_CHANGED');
+                if (isPlaying) {
+                    stop();
+                    play(); 
+                }
+            });
+
+            waveSelector.addEventListener('change', (e) => {
+                synth.setWaveform(e.target.value);
+                gameManager.trackAction('WAVE_CHANGED');
+            });
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                // Re-rendering not strictly necessary with Grid, but good for cleanup
+            });
+        }
+
+        function createGrid() {
+            gridContainer.style.gridTemplateColumns = `repeat(${CONFIG.cols}, minmax(0, 1fr))`;
+            gridContainer.innerHTML = '';
+
+            for (let r = 0; r < CONFIG.rows; r++) {
+                for (let c = 0; c < CONFIG.cols; c++) {
+                    const cell = document.createElement('div');
+                    
+                    // Added 'grid-cell' for custom CSS touch
+                    // Removed fixed aspect ratio, using flex height
+                    // Added w-full h-full to fill grid area
+                    cell.className = `
+                        grid-cell w-full h-full min-h-[30px] rounded-full border-2 border-stone-200 
+                        cursor-pointer hover:border-stone-400
+                        bg-white shadow-sm touch-manipulation
+                    `;
+                    
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    
+                    cell.addEventListener('click', () => toggleCell(r, c, cell));
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+
+        function toggleCell(r, c, element) {
+            const newState = !gridState[r][c];
+            gridState[r][c] = newState;
+
+            if (newState) {
+                element.style.backgroundColor = CONFIG.colors.activeTile;
+                element.style.borderColor = "#788773"; 
+                element.classList.add('shadow-md');
+                // Pop animation
+                element.animate([
+                    { transform: 'scale(1)' },
+                    { transform: 'scale(1.2)' },
+                    { transform: 'scale(1)' }
+                ], { duration: 200 });
+
+                gameManager.trackAction('NOTE_PLACED');
+                synth.playNote(r, 0.2);
+            } else {
+                element.style.backgroundColor = "white";
+                element.style.borderColor = "#E7E5E4";
+                element.classList.remove('shadow-md');
+            }
+        }
+
+        function clearGrid() {
+            gridState = gridState.map(row => row.map(() => false));
+            Array.from(gridContainer.children).forEach(cell => {
+                cell.style.backgroundColor = "white";
+                cell.style.borderColor = "#E7E5E4";
+                cell.classList.remove('shadow-md');
+                cell.style.boxShadow = 'none';
+                cell.style.transform = 'scale(1.0)';
+            });
+            stop();
+        }
+
+        function togglePlay() {
+            if (isPlaying) stop();
+            else play();
+        }
+
+        function play() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            isPlaying = true;
+            playBtn.textContent = "Stop";
+            playBtn.classList.remove('bg-stone-800');
+            playBtn.classList.add('bg-red-800');
+            
+            const bpm = parseInt(tempoSlider.value);
+            const msPerStep = (60 / bpm) * 1000 / 4; 
+            
+            intervalId = setInterval(nextStep, msPerStep);
+        }
+
+        function stop() {
+            isPlaying = false;
+            clearInterval(intervalId);
+            playBtn.textContent = "Play";
+            playBtn.classList.add('bg-stone-800');
+            playBtn.classList.remove('bg-red-800');
+            
+            updatePlayheadUI(-1);
+            currentStep = 0;
+        }
+
+        function nextStep() {
+            let activeNotes = 0;
+            
+            for (let r = 0; r < CONFIG.rows; r++) {
+                if (gridState[r][currentStep]) {
+                    synth.playNote(r, 0.3);
+                    activeNotes++;
+                }
+            }
+
+            if (activeNotes > 0) {
+                gameManager.trackAction('PLAY_STEP', { noteCount: activeNotes });
+            }
+
+            updatePlayheadUI(currentStep);
+            renderBadges(); 
+
+            currentStep++;
+            if (currentStep >= CONFIG.cols) {
+                currentStep = 0;
+            }
+        }
+
+        function updatePlayheadUI(stepIndex) {
+            const cells = Array.from(gridContainer.children);
+            
+            cells.forEach(cell => {
+                const c = parseInt(cell.dataset.col);
+                const r = parseInt(cell.dataset.row);
+                const isActive = gridState[r][c];
+                
+                // Reset to base state
+                if (isActive) {
+                    cell.style.backgroundColor = CONFIG.colors.activeTile;
+                    cell.style.borderColor = "#788773";
+                } else {
+                    cell.style.backgroundColor = 'white';
+                    cell.style.borderColor = "#E7E5E4";
+                }
+
+                // Playhead
+                if (c === stepIndex) {
+                    cell.style.boxShadow = `0 0 0 4px ${CONFIG.colors.playhead}`;
+                    if(isActive) {
+                        cell.style.transform = 'scale(1.15)'; 
+                        cell.style.filter = 'brightness(1.1)';
+                    } else {
+                        cell.style.transform = 'scale(1.05)'; 
+                    }
+                } else {
+                    if (cell.style.boxShadow.includes(CONFIG.colors.playhead)) {
+                        cell.style.boxShadow = 'none';
+                    }
+                    if(isActive) cell.classList.add('shadow-md');
+                    cell.style.filter = 'none';
+                    cell.style.transform = 'scale(1.0)';
+                }
+            });
+        }
+
+        function renderBadges() {
+            badgeList.innerHTML = '';
+            const unlocked = gameManager.state.unlockedBadges;
+            
+            CONFIG.badges.forEach(badge => {
+                const isUnlocked = unlocked.includes(badge.id);
+                const badgeEl = document.createElement('div');
+                
+                badgeEl.className = `
+                    flex flex-col items-center justify-center p-2 rounded-lg text-center min-w-[80px]
+                    ${isUnlocked ? 'bg-amber-100 text-stone-800 border-2 border-amber-300' : 'bg-stone-100 text-stone-300 border border-stone-200'}
+                `;
+                
+                badgeEl.innerHTML = `
+                    <div class="text-2xl mb-1 filter ${isUnlocked ? '' : 'grayscale opacity-30'}">${badge.icon}</div>
+                    <div class="text-xs font-bold leading-tight">${badge.name}</div>
+                `;
+                
+                badgeEl.title = isUnlocked ? badge.description : "Keep exploring to unlock!";
+                badgeList.appendChild(badgeEl);
+            });
+        }
+
+        // Start the app
+        window.addEventListener('load', init);
+
+    </script>
+</body>
+</html>
