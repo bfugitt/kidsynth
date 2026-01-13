@@ -530,8 +530,6 @@
 
         function drawPlayhead(colIndex) {
             // Find all cells in this column
-            // We can calculate their indices or query them. Since grid is static, indices are faster.
-            // But DOM query is safer if structure changes.
             const cells = gridContainer.children;
             
             for (let i = 0; i < cells.length; i++) {
@@ -556,7 +554,8 @@
 
         function captureAppState() {
             return {
-                gridState: gridState, // Copy logic handled by JSON.stringify
+                // FIXED: Create a deep copy of the grid so future edits don't change the save!
+                gridState: gridState.map(row => [...row]), 
                 bpm: document.getElementById('tempo').value,
                 waveform: document.getElementById('waveform').value,
                 filter: document.getElementById('filter-cutoff').value,
